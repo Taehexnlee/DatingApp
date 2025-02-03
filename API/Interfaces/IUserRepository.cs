@@ -1,6 +1,8 @@
 using System;
+using System.Security.Claims;
 using API.DTOs;
 using API.Entities;
+using AutoMapper;
 
 namespace API.Interfaces;
 
@@ -13,6 +15,4 @@ public interface IUserRepository
     Task<AppUser?>GetUserbyUsernameAsync(string username);
     Task<IEnumerable<MemberDto>>GetMembersAsync();
     Task<MemberDto?>GetMemberAsync(string username);
-
-
 }
