@@ -4,38 +4,102 @@ import { HttpClient } from '@angular/common/http';
 import { PaginatedResult } from '../_models/pagination';
 import { Message } from '../_models/message';
 import { setPaginatedResponse, setPaginationHeaders } from './paginationHelper';
-import { Member } from '../_models/member';
+import { HubConnection, HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr';
+import { User } from '../_models/user';
+import { Group } from '../_models/group';
 
 @Injectable({
   providedIn: 'root'
 })
 export class MessageService {
-  baseUrl = environment.apiUrl
-  private http = inject(HttpClient)
+  apiUrl = environment.apiUrl;
+  hubsUrl = environment.hubsUrl;
+
+  private http = inject(HttpClient);
+  hubConnection?: HubConnection;
+
   paginatedResult = signal<PaginatedResult<Message[]> | null>(null);
-  
-  getMessages(pageNumber: number, pageSize: number, container:string)
-  {
+  messageThread = signal<Message[]>([]);
+
+  createHubConnection(user: User, otherUsername: string) {
+    if (this.hubConnection?.state === HubConnectionState.Connected) {
+      console.log('Hub already connected');
+      return;
+    }
+
+    this.hubConnection = new HubConnectionBuilder()
+      .withUrl(this.hubsUrl + 'message?user=' + otherUsername, {
+        accessTokenFactory: () => user.token
+      })
+      .withAutomaticReconnect()
+      .build();
+
+    this.hubConnection.start()
+      .then(() => console.log('✅ Hub connection started'))
+      .catch(error => console.log('Hub connection error:', error));
+
+    this.hubConnection.on('ReceiveMessageThread', messages => {
+      console.log('📩 Received message thread:', messages);
+      this.messageThread.set(messages);
+    });
+
+    this.hubConnection.on('NewMessage', message => {
+      this.messageThread.update(messages => [...messages, message]);
+    });
+
+    this.hubConnection.on('UpdatedGroup', (group: Group) => {
+      if (group.connections?.some(x => x.username === otherUsername)) {
+        this.messageThread.update(messages =>
+          messages.map(m => {
+            if (!m.dateRead) {
+              return { ...m, dateRead: new Date(Date.now()) };
+            }
+            return m;
+          })
+        );
+      }
+    });
+  }
+
+  stopHubConenction() {
+    if (this.hubConnection?.state === HubConnectionState.Connected) {
+      this.hubConnection.stop()
+        .then(() => console.log('🛑 Hub disconnected'))
+        .catch(error => console.log('Hub stop error:', error));
+    }
+  }
+
+  getMessages(pageNumber: number, pageSize: number, container: string) {
     let params = setPaginationHeaders(pageNumber, pageSize);
     params = params.append('Container', container);
-    return this.http.get<Message[]>(this.baseUrl + "messages", {observe:'response', params})
+
+    return this.http.get<Message[]>(this.apiUrl + 'messages', { observe: 'response', params })
       .subscribe({
-        next: response =>setPaginatedResponse(response, this.paginatedResult)
-      })
-  }
-  getMessageThread(username: string)
-  {
-    return this.http.get<Message[]>(this.baseUrl + "messages/thread/" +username );
+        next: response => setPaginatedResponse(response, this.paginatedResult)
+      });
   }
 
-  senderMessage(username: string, content: string)
-  {
-    return this.http.post<Message>(this.baseUrl + 'messages', {recipientUsername: username, content})
+  getMessageThread(username: string) {
+    return this.http.get<Message[]>(this.apiUrl + 'messages/thread/' + username);
   }
 
-  deleteMessage(id: number)
-{
-  return this.http.delete(this.baseUrl + 'messages/' + id);
-}
+  async sendMessage(username: string, content: string) {
+    if (!this.hubConnection || this.hubConnection.state !== HubConnectionState.Connected) {
+      console.warn('❗ 메시지 전송 실패: SignalR 연결되지 않음');
+      return;
+    }
 
+    try {
+      await this.hubConnection.invoke('SendMessage', {
+        recipientUsername: username,
+        content
+      });
+    } catch (error) {
+      console.error('❗ 메시지 전송 중 오류 발생:', error);
+    }
+  }
+
+  deleteMessage(id: number) {
+    return this.http.delete(this.apiUrl + 'messages/' + id);
+  }
 }
