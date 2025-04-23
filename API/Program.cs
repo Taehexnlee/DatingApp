@@ -41,6 +41,9 @@ app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 // ✅ Content-Security-Policy 설정은 개발 환경에서만
 if (app.Environment.IsDevelopment())
 {
@@ -55,6 +58,7 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 app.MapHub<PresenceHub>("hubs/presence");
 app.MapHub<MessageHub>("hubs/message");
+app.MapFallbackToController("Index", "Fallback");
 
 // ✅ DB 마이그레이션 및 시드
 using var scope = app.Services.CreateScope();
