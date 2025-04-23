@@ -15,15 +15,17 @@ export class MemberMessagesComponent implements AfterViewChecked{
   messageService = inject(MessageService);
   username = input.required<string>();
   messageContent = '';
+  loading = false;
 
   // ✅ Signal binding
   messageThread = this.messageService.messageThread;
 
   sendMessage() {
+    this.loading =true;
     this.messageService.sendMessage(this.username(), this.messageContent).then(()=> {
       this.messageForm?.reset();
       this.scrollToBottom();
-    })
+    }).finally(()=>this.loading =false);
   
   }
   ngAfterViewChecked(): void {
