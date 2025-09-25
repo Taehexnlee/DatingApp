@@ -22,7 +22,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("CorsPolicy", policy =>
     {
         policy
-            .WithOrigins("http://localhost:4200") // ✅ 정확히 일치
+            .WithOrigins("http://localhost:4200") // Require exact origin match
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -31,20 +31,20 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// ✅ 반드시 CORS보다 먼저 예외 방지
+// Run routing before CORS to avoid exceptions
 app.UseRouting();
 
-// ✅ CORS 먼저
+// Apply CORS before auth middleware
 app.UseCors("CorsPolicy");
 
-// ✅ 그다음 인증/인가
+// Then run authentication and authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-// ✅ Content-Security-Policy 설정은 개발 환경에서만
+// Only add Content-Security-Policy in development
 if (app.Environment.IsDevelopment())
 {
     app.Use(async (context, next) =>
@@ -54,13 +54,13 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// ✅ 엔드포인트 매핑
+// Map endpoints
 app.MapControllers();
 app.MapHub<PresenceHub>("hubs/presence");
 app.MapHub<MessageHub>("hubs/message");
 app.MapFallbackToController("Index", "Fallback");
 
-// ✅ DB 마이그레이션 및 시드
+// Run database migrations and seed data
 using var scope = app.Services.CreateScope();
 var services = scope.ServiceProvider;
 

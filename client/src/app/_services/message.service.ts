@@ -88,7 +88,7 @@ export class MessageService {
 
   async sendMessage(username: string, content: string) {
     if (!this.hubConnection || this.hubConnection.state !== HubConnectionState.Connected) {
-      console.warn('❗ 메시지 전송 실패: SignalR 연결되지 않음');
+      console.warn('❗ Message send failed: SignalR connection not established');
       return;
     }
 
@@ -98,7 +98,7 @@ export class MessageService {
         content
       });
     } catch (error) {
-      console.error('❗ 메시지 전송 중 오류 발생:', error);
+      console.error('❗ Error while sending message:', error);
     }
   }
 
